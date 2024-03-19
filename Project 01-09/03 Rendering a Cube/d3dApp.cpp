@@ -3,6 +3,9 @@
 #include "DXTrace.h"
 #include <sstream>
 
+#include "Mouse.h"
+#include "Keyboard.h"
+
 #pragma warning(disable: 6031)
 
 extern "C"
@@ -47,6 +50,7 @@ D3DApp::D3DApp(HINSTANCE hInstance, const std::wstring& windowName, int initWidt
     m_pDepthStencilBuffer(nullptr),
     m_pRenderTargetView(nullptr),
     m_pDepthStencilView(nullptr)
+    
 {
     ZeroMemory(&m_ScreenViewport, sizeof(D3D11_VIEWPORT));
 
@@ -113,6 +117,9 @@ int D3DApp::Run()
 
 bool D3DApp::Init()
 {
+    myMouse = std::make_unique<DirectX::Mouse>();
+    myKeyboard= std::make_unique<DirectX::Keyboard>();
+
     if (!InitMainWindow())
         return false;
 
@@ -314,17 +321,41 @@ LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         ((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;
         return 0;
 
+
+    //检测鼠标和键盘事件
+    case WM_INPUT:
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_RBUTTONDOWN:
-        return 0;
+    case WM_XBUTTONDOWN:
+
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
-        return 0;
+    case WM_XBUTTONUP:
+
+    case WM_MOUSEWHEEL:
+    case WM_MOUSEHOVER:
     case WM_MOUSEMOVE:
+        myMouse->ProcessMessage(msg, wParam, lParam);
         return 0;
+
+       
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        myKeyboard->ProcessMessage(msg, wParam, lParam);
+        return 0;
+
+    case WM_ACTIVATEAPP:
+        myMouse->ProcessMessage(msg, wParam, lParam);
+        myKeyboard->ProcessMessage(msg, wParam, lParam);
+        return 0;
+
     }
+
+    
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }
@@ -434,7 +465,7 @@ bool D3DApp::InitDirect3D()
     assert(m_4xMsaaQuality > 0);
 
 
-
+    
 
     ComPtr<IDXGIDevice> dxgiDevice = nullptr;
     ComPtr<IDXGIAdapter> dxgiAdapter = nullptr;
@@ -559,3 +590,4 @@ void D3DApp::CalculateFrameStats()
 }
 
 
+//hWnd

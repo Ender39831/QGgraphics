@@ -15,7 +15,8 @@ public:
 
     struct ConstantBuffer
     {
-        DirectX::XMMATRIX world;
+        DirectX::XMMATRIX
+            world;
         DirectX::XMMATRIX view;
         DirectX::XMMATRIX proj;
     };

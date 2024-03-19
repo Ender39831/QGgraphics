@@ -1,6 +1,9 @@
 #include "GameApp.h"
 #include "d3dUtil.h"
 #include "DXTrace.h"
+
+#include "Mouse.h"
+#include "Keyboard.h"
 using namespace DirectX;
 
 const D3D11_INPUT_ELEMENT_DESC GameApp::VertexPosColor::inputLayout[2] = {
@@ -28,6 +31,15 @@ bool GameApp::Init()
     if (!InitResource())
         return false;
 
+    myMouse->SetWindow(m_hMainWnd);    //绑定窗口句柄
+    myMouse->SetMode(DirectX::Mouse::MODE_ABSOLUTE);  //设置鼠标模式
+
+    
+    //将各个矩阵初始化为单位矩阵
+    translation = XMMatrixIdentity();
+    rotation = XMMatrixIdentity();
+    scaling = XMMatrixIdentity();
+
     return true;
 }
 
@@ -36,12 +48,46 @@ void GameApp::OnResize()
     D3DApp::OnResize();
 }
 
-void GameApp::UpdateScene(float dt)
+void GameApp::UpdateScene(float dt)    //dt为两帧间隔时间
 {
     
-    static float phi = 0.0f, theta = 0.0f;
-    phi += 0.3f * dt, theta += 0.37f * dt;
-    m_CBuffer.world = XMMatrixTranspose(XMMatrixRotationX(phi) * XMMatrixRotationY(theta));
+    static float phi = 0.0f, theta = 0.0f, dy=0.0f, dx=0.0f, sca=1.0f;
+
+    //获取鼠标状态
+    Mouse::State mouseState = myMouse->GetState();
+    Mouse::State lastMouseState = myMouseTracker.GetLastState();
+    
+    //获取键盘状态
+    Keyboard::State KeyState = myKeyboard->GetState();
+    Keyboard::State lastKeyState = myKeyboardTracker.GetLastState();
+    
+    myMouseTracker.Update(mouseState);// 更新鼠标按钮状态跟踪器
+    myKeyboardTracker.Update(KeyState);//更新键盘状态
+
+    int mouseWheelValue = mouseState.scrollWheelValue - lastMouseState.scrollWheelValue;
+    if (mouseState.leftButton == true && myMouseTracker.leftButton == myMouseTracker.HELD)
+    {
+        // 旋转立方体
+        theta -= (mouseState.x - lastMouseState.x) * 0.01f;
+        phi -= (mouseState.y - lastMouseState.y) * 0.01f;
+        //m_CBuffer.world = XMMatrixRotationY(theta) * XMMatrixRotationX(phi);
+    }
+   
+    sca += mouseWheelValue * 0.0005f;
+    scaling = XMMatrixScaling(sca, sca, sca);   //得到缩放矩阵
+
+    if (KeyState.IsKeyDown(Keyboard::S))
+        dy -= dt * 2;
+    if (KeyState.IsKeyDown(Keyboard::W))
+        dy += dt * 2;
+    if (KeyState.IsKeyDown(Keyboard::D))
+        dx += dt * 2;
+    if (KeyState.IsKeyDown(Keyboard::A))
+        dx -= dt * 2;
+
+    translation = XMMatrixTranslation(dx, dy, 0.0f);
+    rotation = XMMatrixRotationY(theta) * XMMatrixRotationX(phi);
+    m_CBuffer.world = XMMatrixTranspose(XMMatrixMultiply(XMMatrixMultiply(scaling, rotation), translation));
     // 更新常量缓冲区，让立方体转起来
     D3D11_MAPPED_SUBRESOURCE mappedData;
     HR(m_pd3dImmediateContext->Map(m_pConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
@@ -84,23 +130,15 @@ bool GameApp::InitEffect()
 
 bool GameApp::InitResource()
 {
-    // ******************
-    // 设置立方体顶点
-    //    5________ 6
-    //    /|      /|
-    //   /_|_____/ |
-    //  1|4|_ _ 2|_|7
-    //   | /     | /
-    //   |/______|/
-    //  0       3
     VertexPosColor vertices[] =
     {
-        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f) },
+        // 设置四棱台顶点
+        { XMFLOAT3(-0.5f, -0.5f, -0.5f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(-0.5f, 0.5f, -0.5f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f) },
         { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
         { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-0.5f, -0.5f, 0.5f), XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-0.5f, 0.5f, 0.5f), XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f) },
         { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) },
         { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT4(0.0f, 1.0f, 1.0f, 1.0f) }
     };
@@ -209,3 +247,4 @@ bool GameApp::InitResource()
 
     return true;
 }
+//MinWnd
