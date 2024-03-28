@@ -52,6 +52,8 @@ void GameApp::UpdateScene(float dt)    //dt为两帧间隔时间
 {
     
     static float phi = 0.0f, theta = 0.0f, dy=0.0f, dx=0.0f, sca=1.0f;
+    //phi += 0.3f * dt, theta += 0.37f * dt;
+    //m_CBuffer.world = XMMatrixTranspose(XMMatrixRotationX(phi) * XMMatrixRotationY(theta));
 
     //获取鼠标状态
     Mouse::State mouseState = myMouse->GetState();
@@ -59,7 +61,6 @@ void GameApp::UpdateScene(float dt)    //dt为两帧间隔时间
     
     //获取键盘状态
     Keyboard::State KeyState = myKeyboard->GetState();
-    Keyboard::State lastKeyState = myKeyboardTracker.GetLastState();
     
     myMouseTracker.Update(mouseState);// 更新鼠标按钮状态跟踪器
     myKeyboardTracker.Update(KeyState);//更新键盘状态
@@ -72,10 +73,10 @@ void GameApp::UpdateScene(float dt)    //dt为两帧间隔时间
         phi -= (mouseState.y - lastMouseState.y) * 0.01f;
         //m_CBuffer.world = XMMatrixRotationY(theta) * XMMatrixRotationX(phi);
     }
-   
+   // 通过滚轮缩放
     sca += mouseWheelValue * 0.0005f;
     scaling = XMMatrixScaling(sca, sca, sca);   //得到缩放矩阵
-
+    // 通过键盘移动
     if (KeyState.IsKeyDown(Keyboard::S))
         dy -= dt * 2;
     if (KeyState.IsKeyDown(Keyboard::W))
@@ -87,7 +88,10 @@ void GameApp::UpdateScene(float dt)    //dt为两帧间隔时间
 
     translation = XMMatrixTranslation(dx, dy, 0.0f);
     rotation = XMMatrixRotationY(theta) * XMMatrixRotationX(phi);
+
+    // 最后合成世界变换矩阵
     m_CBuffer.world = XMMatrixTranspose(XMMatrixMultiply(XMMatrixMultiply(scaling, rotation), translation));
+
     // 更新常量缓冲区，让立方体转起来
     D3D11_MAPPED_SUBRESOURCE mappedData;
     HR(m_pd3dImmediateContext->Map(m_pConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
@@ -130,8 +134,28 @@ bool GameApp::InitEffect()
 
 bool GameApp::InitResource()
 {
+    // ******************
+    // 设置立方体顶点
+    //    5________ 6
+    //    /|      /|
+    //   /_|_____/ |
+    //  1|4|_ _ 2|_|7
+    //   | /     | /
+    //   |/______|/
+    //  0       3
     VertexPosColor vertices[] =
     {
+        /*
+        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT4(0.0f, 1.0f, 1.0f, 1.0f) }
+        */
+
         // 设置四棱台顶点
         { XMFLOAT3(-0.5f, -0.5f, -0.5f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f) },
         { XMFLOAT3(-0.5f, 0.5f, -0.5f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f) },
@@ -213,8 +237,10 @@ bool GameApp::InitResource()
         XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
         XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
     ));
+    // 透视投影
     m_CBuffer.proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XM_PIDIV2, AspectRatio(), 1.0f, 1000.0f));
-
+    // 修改为正交投影
+    //m_CBuffer.proj = XMMatrixTranspose(XMMatrixOrthographicLH(5.0f, 3.0f, 1.0f, 1000.0f));
 
     // ******************
     // 给渲染管线各个阶段绑定好所需资源
