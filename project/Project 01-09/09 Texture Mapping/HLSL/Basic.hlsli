@@ -10,6 +10,8 @@ cbuffer VSConstantBuffer : register(b0)
     matrix g_View;  
     matrix g_Proj;  
     matrix g_WorldInvTranspose;
+    
+    matrix g_RotationTex; //声明一个纹理旋转
 }
 
 cbuffer PSConstantBuffer : register(b1)

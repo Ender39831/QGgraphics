@@ -10,6 +10,9 @@ VertexPosHWNormalTex VS(VertexPosNormalTex vIn)
     vOut.posH = mul(posW, viewProj);
     vOut.posW = posW.xyz;
     vOut.normalW = mul(vIn.normalL, (float3x3) g_WorldInvTranspose);
-    vOut.tex = vIn.tex;
+    
+    vOut.tex = mul(float4(vIn.tex, 0.0f, 1.0f), g_RotationTex); // 让纹理坐标乘一个旋转矩阵
+    
+    //vOut.tex = vIn.tex;   // 项目原代码
     return vOut;
 }

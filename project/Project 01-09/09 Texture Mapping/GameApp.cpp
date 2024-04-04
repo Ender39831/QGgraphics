@@ -9,7 +9,7 @@ GameApp::GameApp(HINSTANCE hInstance, const std::wstring& windowName, int initWi
     : D3DApp(hInstance, windowName, initWidth, initHeight),
     m_IndexCount(),	
     m_CurrFrame(),
-    m_CurrMode(ShowMode::WoodCrate),
+    m_CurrMode(ShowMode::flare),
     m_VSConstantBuffer(),
     m_PSConstantBuffer()
 {
@@ -44,21 +44,21 @@ void GameApp::UpdateScene(float dt)
     {
         static int curr_mode_item = static_cast<int>(m_CurrMode);
         const char* mode_strs[] = {
-            "Box",
+            "Flare",
             "Fire Anim"
         };
         if (ImGui::Combo("Mode", &curr_mode_item, mode_strs, ARRAYSIZE(mode_strs)))
         {
             if (curr_mode_item == 0)
             {
-                // 播放木箱动画
-                m_CurrMode = ShowMode::WoodCrate;
+                // 播放耀斑动画
+                m_CurrMode = ShowMode::flare;
                 m_pd3dImmediateContext->IASetInputLayout(m_pVertexLayout3D.Get());
                 auto meshData = Geometry::CreateBox();
                 ResetMesh(meshData);
                 m_pd3dImmediateContext->VSSetShader(m_pVertexShader3D.Get(), nullptr, 0);
                 m_pd3dImmediateContext->PSSetShader(m_pPixelShader3D.Get(), nullptr, 0);
-                m_pd3dImmediateContext->PSSetShaderResources(0, 1, m_pWoodCrate.GetAddressOf());
+                m_pd3dImmediateContext->PSSetShaderResources(0, 1, m_pflare.GetAddressOf());
             }
             else
             {
@@ -76,13 +76,30 @@ void GameApp::UpdateScene(float dt)
     ImGui::End();
     ImGui::Render();
 
-    if (m_CurrMode == ShowMode::WoodCrate)
+    if (m_CurrMode == ShowMode::flare)
     {
         static float phi = 0.0f, theta = 0.0f;
-        phi += 0.0001f, theta += 0.00015f;
+        phi += 0.0005f, theta += 0.00075f;
         XMMATRIX W = XMMatrixRotationX(phi) * XMMatrixRotationY(theta);
+
         m_VSConstantBuffer.world = XMMatrixTranspose(W);
         m_VSConstantBuffer.worldInvTranspose = XMMatrixTranspose(InverseTranspose(W));
+
+        static float a = 0.0f;
+        a += 0.005f;
+        // 位置偏移，所以先移动再旋转,然后移回来(直接旋转的话中心有问题，效果很怪)
+        XMMATRIX tempRotation = XMMatrixTranslation(-0.5f, -0.5f, 0.0f) * XMMatrixRotationZ(a) * XMMatrixTranslation(0.5f, 0.5f, 0.0f);
+        m_VSConstantBuffer.rotation = XMMatrixTranspose(tempRotation); //纹理旋转
+
+        /*
+        //劣质版，被我废除了
+        static float alpha = 0.0f;
+        alpha += 0.01f;             // 使纹理逆时针旋转
+        // 先平移回原点再旋转，转完再平移回来
+        XMMATRIX RotateMatrix = XMMatrixTranslation(-0.5f, -0.5f, 0.0f) * XMMatrixRotationZ(alpha) * XMMatrixTranslation(0.5f, 0.5f, 0.0f);
+        //XMMATRIX RotateMatrix = XMMatrixRotationZ(alpha);  //直接用套上旋转矩阵有点问题
+        m_VSConstantBuffer.worldInvTranspose = XMMatrixTranspose(RotateMatrix);
+        */
 
         // 更新常量缓冲区，让立方体转起来
         D3D11_MAPPED_SUBRESOURCE mappedData;
@@ -175,8 +192,8 @@ bool GameApp::InitResource()
     // 初始化纹理和采样器状态
     //
 
-    // 初始化木箱纹理
-    HR(CreateDDSTextureFromFile(m_pd3dDevice.Get(), L"..\\Texture\\WoodCrate.dds", nullptr, m_pWoodCrate.GetAddressOf()));
+    // 初始化耀斑纹理
+    HR(CreateDDSTextureFromFile(m_pd3dDevice.Get(), L"..\\Texture\\flare.dds", nullptr, m_pflare.GetAddressOf()));
     // 初始化火焰纹理
     WCHAR strFile[40];
     m_pFireAnims.resize(120);
@@ -189,10 +206,39 @@ bool GameApp::InitResource()
     // 初始化采样器状态
     D3D11_SAMPLER_DESC sampDesc;
     ZeroMemory(&sampDesc, sizeof(sampDesc));
-    sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-    sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-    sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+
+    //sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;     // 点采样 点采样 点采样
+    //sampDesc.Filter = D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR; // 点采样 点采样 线性采样
+    //sampDesc.Filter = D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT; // 点 线 点
+    //sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;  // 线 线 线
+    sampDesc.Filter = D3D11_FILTER_ANISOTROPIC;           // 各向异性 各向异性 各向异性
+
+    //sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    //sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_MIRROR;
+    //sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+    //sampDesc.AddressU = D3D11_TEXTURE_BORDER_COLOR;        //未声明的标识符？
+    sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_MIRROR_ONCE;
+
+    //sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    //sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_MIRROR;
+    //sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+    //sampDesc.AddressV = D3D11_TEXTURE_BORDER_COLOR;        //未声明的标识符？
+    sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_MIRROR_ONCE;
+
+    //sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    //sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_MIRROR;
+    //sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    //sampDesc.AddressW = D3D11_TEXTURE_BORDER_COLOR;        //未声明的标识符？
+    sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_MIRROR_ONCE;
+
+    // 用D3D11_TEXTURE_BORDER_COLO的时候需要给BorderColor赋值,但是不知道为啥用不了
+    /*
+    sampDesc.BorderColor[0] = 0.0f;
+    sampDesc.BorderColor[1] = 0.0f;
+    sampDesc.BorderColor[2] = 1.0f;
+    sampDesc.BorderColor[3] = 1.0f;
+    */
+
     sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
     sampDesc.MinLOD = 0;
     sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
@@ -250,7 +296,7 @@ bool GameApp::InitResource()
     m_pd3dImmediateContext->PSSetConstantBuffers(1, 1, m_pConstantBuffers[1].GetAddressOf());
     // 像素着色阶段设置好采样器
     m_pd3dImmediateContext->PSSetSamplers(0, 1, m_pSamplerState.GetAddressOf());
-    m_pd3dImmediateContext->PSSetShaderResources(0, 1, m_pWoodCrate.GetAddressOf());
+    m_pd3dImmediateContext->PSSetShaderResources(0, 1, m_pflare.GetAddressOf());
     m_pd3dImmediateContext->PSSetShader(m_pPixelShader3D.Get(), nullptr, 0);
     
     // ******************

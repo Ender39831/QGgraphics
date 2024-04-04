@@ -14,6 +14,8 @@ public:
         DirectX::XMMATRIX view;
         DirectX::XMMATRIX proj;
         DirectX::XMMATRIX worldInvTranspose;
+
+        DirectX::XMMATRIX rotation;    // 用于旋转的矩阵
     };
 
     struct PSConstantBuffer
@@ -29,7 +31,7 @@ public:
         DirectX::XMFLOAT4 eyePos;
     };
 
-    enum class ShowMode { WoodCrate, FireAnim };
+    enum class ShowMode { flare, FireAnim };
 
 public:
     GameApp(HINSTANCE hInstance, const std::wstring& windowName, int initWidth, int initHeight);
@@ -59,7 +61,7 @@ private:
     int m_CurrFrame;											// 当前火焰动画播放到第几帧
     ShowMode m_CurrMode;										// 当前显示的模式
 
-    ComPtr<ID3D11ShaderResourceView> m_pWoodCrate;			    // 木盒纹理
+    ComPtr<ID3D11ShaderResourceView> m_pflare;			    // 耀斑纹理
     std::vector<ComPtr<ID3D11ShaderResourceView>> m_pFireAnims; // 火焰纹理集
     ComPtr<ID3D11SamplerState> m_pSamplerState;				    // 采样器状态
 
