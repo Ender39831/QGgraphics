@@ -108,7 +108,9 @@ bool SkyboxEffect::InitAll(ID3D11Device* device)
     HR(pImpl->m_pEffectHelper->AddEffectPass("Skybox", device, &passDesc));
     {
         auto pPass = pImpl->m_pEffectHelper->GetEffectPass("Skybox");
+        // 光栅化阶段关闭背面消隐
         pPass->SetRasterizerState(RenderStates::RSNoCull.Get());
+        // 设置深度比较函数为小于等于，以允许深度值为1的东西绘制
         pPass->SetDepthStencilState(RenderStates::DSSLessEqual.Get(), 0);
     }
 

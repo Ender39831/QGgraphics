@@ -5,7 +5,7 @@
 #include <WinMin.h>
 #include "d3dApp.h"
 #include "Effects.h"
-#include <CameraController.h>
+#include <Camera.h>
 #include <RenderStates.h>
 #include <GameObject.h>
 #include <Texture2D.h>
@@ -27,24 +27,26 @@ public:
 
 private:
     bool InitResource();
-    
+
 private:
 
     TextureManager m_TextureManager;
     ModelManager m_ModelManager;
 
-    BasicEffect m_BasicEffect;		            			    // 对象渲染特效管理
-    SkyboxEffect m_SkyboxEffect;							    // 天空盒特效管理
+    BasicEffect m_BasicEffect;			                        // 对象渲染特效管理
 
     std::unique_ptr<Depth2D> m_pDepthTexture;                   // 深度缓冲区
 
     GameObject m_Sphere;										// 球
-    GameObject m_Ground;										// 地面
-    GameObject m_Cylinder;									    // 圆柱
-    GameObject m_Skybox;                                        // 天空盒
+    GameObject m_Cube;										    // 立方体
+    GameObject m_Cylinder;									    // 圆柱体
+    GameObject m_House;										    // 房屋
+    GameObject m_Triangle;									    // 三角形
+    DirectX::BoundingSphere m_BoundingSphere;				    // 球的包围盒
+
+    GeometryData m_TriangleMesh;						        // 三角形网格模型
 
     std::shared_ptr<FirstPersonCamera> m_pCamera;			    // 摄像机
-    FirstPersonCameraController m_CameraController;             // 摄像机控制器 
 };
 
 

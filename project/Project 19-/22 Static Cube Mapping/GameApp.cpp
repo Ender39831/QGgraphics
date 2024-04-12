@@ -3,6 +3,8 @@
 #include <DXTrace.h>
 using namespace DirectX;
 
+int i = 0; // 全局变量，表示创建了几个立方体
+
 GameApp::GameApp(HINSTANCE hInstance, const std::wstring& windowName, int initWidth, int initHeight)
     : D3DApp(hInstance, windowName, initWidth, initHeight)
 {
@@ -56,7 +58,84 @@ void GameApp::OnResize()
 void GameApp::UpdateScene(float dt)
 {
     m_CameraController.Update(dt);
-    
+
+    // 拾取
+    // 获取键鼠输入(一开始以为用的mouse和keyboard，弄了半天搞不明白才反应过来这里用的ImGui)
+    ImGuiIO& io = ImGui::GetIO();
+    // 获取鼠标在屏幕上位置
+    ImVec2 mousePos = ImGui::GetMousePos();
+    mousePos.x = std::clamp(mousePos.x, 0.0f, m_ClientWidth - 1.0f);
+    mousePos.y = std::clamp(mousePos.y, 0.0f, m_ClientHeight - 1.0f);
+    // 生成射线
+    Ray ray = Ray::ScreenToRay(*m_pCamera, mousePos.x, mousePos.y);
+
+    // 判断是否碰撞
+    bool hitObject = false;
+    std::string pick = "None";
+    if (ray.Hit(m_Sphere.GetBoundingOrientedBox()))
+    {
+        pick = "Sphere";
+        hitObject = true;
+    }
+    else if (ray.Hit(m_Ground.GetBoundingOrientedBox()))
+    {
+        pick = "Ground";
+        hitObject = true;
+    }
+    else if (ray.Hit(m_Cylinder.GetBoundingOrientedBox()))
+    {
+        pick = "Cylinder";
+        hitObject = true;
+    }
+
+    for (int m = 0; m < i; m++)
+    {
+        if (ray.Hit(m_Box[m].GetBoundingOrientedBox()))
+        {
+            pick = "Cube";
+            hitObject = true;
+        }
+    }
+
+    // 放置物体
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        // 获取鼠标的指向位置
+        XMFLOAT3 putPos = m_pCamera->GetPosition();
+        XMFLOAT3 putDir = m_pCamera->GetLookAxis();
+
+        // 各种设置
+        Model* createModel = m_ModelManager.CreateFromGeometry("box", Geometry::CreateBox());
+        createModel->SetDebugObjectName("createModel");
+        m_TextureManager.CreateFromFile("..\\Texture\\bricks.dds");
+        createModel->materials[0].Set<std::string>("$Diffuse", "..\\Texture\\bricks.dds");
+        createModel->materials[0].Set<XMFLOAT4>("$AmbientColor", XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f));
+        createModel->materials[0].Set<XMFLOAT4>("$DiffuseColor", XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f));
+        createModel->materials[0].Set<XMFLOAT4>("$SpecularColor", XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
+        createModel->materials[0].Set<float>("$SpecularPower", 12.0f);
+        createModel->materials[0].Set<XMFLOAT4>("$ReflectColor", XMFLOAT4());
+        m_Box[i].SetModel(createModel);
+        m_Box[i].GetTransform().SetPosition(putDir.x * 5.0f + putPos.x, putDir.y * 5.0f + putPos.y, putDir.z * 5.0f + putPos.z);
+
+        i++;
+        if (i >= 39)//判断是否超出最大值
+            i = 0;
+    }
+
+    // F销毁方块，不知道为啥不太灵敏
+    //if (ImGui::IsKeyPressed(ImGuiKey_F))
+    // 还是用右键吧
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+    {
+        for (int k = 0; k < i; k++)
+        {
+            if (ray.Hit(m_Box[k].GetBoundingOrientedBox()) && k != i)
+            {
+                m_Box[k] = m_Box[k + 1]; //把删除正方体后的正方体往前移
+                i--;
+            }
+        }
+    }
 
     // 更新观察矩阵
     m_BasicEffect.SetViewMatrix(m_pCamera->GetViewMatrixXM());
@@ -66,11 +145,13 @@ void GameApp::UpdateScene(float dt)
 
     if (ImGui::Begin("Static Cube Mapping"))
     {
+        ImGui::Text("Current Object: %s", pick.c_str());
+
         static int skybox_item = 0;
         static const char* skybox_strs[] = {
             "Daylight",
             "Sunset",
-            "Desert"
+            "illness"
         };
         if (ImGui::Combo("Skybox", &skybox_item, skybox_strs, ARRAYSIZE(skybox_strs)))
         {
@@ -86,8 +167,8 @@ void GameApp::UpdateScene(float dt)
                 pModel->materials[0].Set<std::string>("$Skybox", "Sunset");
                 break;
             case 2: 
-                m_BasicEffect.SetTextureCube(m_TextureManager.GetTexture("Desert")); 
-                pModel->materials[0].Set<std::string>("$Skybox", "Desert");
+                m_BasicEffect.SetTextureCube(m_TextureManager.GetTexture("illness")); 
+                pModel->materials[0].Set<std::string>("$Skybox", "illness");
                 break;
             }
         }
@@ -98,6 +179,8 @@ void GameApp::UpdateScene(float dt)
 
 void GameApp::DrawScene()
 {
+    
+
     // 创建后备缓冲区的渲染目标视图
     if (m_FrameCount < m_BackBufferCount)
     {
@@ -124,19 +207,26 @@ void GameApp::DrawScene()
     m_Ground.Draw(m_pd3dImmediateContext.Get(), m_BasicEffect);
     m_Cylinder.Draw(m_pd3dImmediateContext.Get(), m_BasicEffect);
 
+    // 绘制创建的立方体
+    for (int temp = 0; temp < i; temp++)
+    {
+        m_Box[temp].Draw(m_pd3dImmediateContext.Get(), m_BasicEffect);
+    }
 
     // 绘制天空盒
     m_SkyboxEffect.SetRenderDefault();
     m_Skybox.Draw(m_pd3dImmediateContext.Get(), m_SkyboxEffect);
 
-
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
     HR(m_pSwapChain->Present(0, m_IsDxgiFlipModel ? DXGI_PRESENT_ALLOW_TEARING : 0));
+
+    
 }
 
 bool GameApp::InitResource()
 {
+
     // ******************
     // 初始化天空盒相关
     
@@ -188,7 +278,10 @@ bool GameApp::InitResource()
     }
     
     // Desert
-    m_TextureManager.AddTexture("Desert", m_TextureManager.CreateFromFile("..\\Texture\\desertcube1024.dds", false, true));
+    //m_TextureManager.AddTexture("Desert", m_TextureManager.CreateFromFile("..\\Texture\\desertcube1024.dds", false, true));
+    
+    // illness
+    m_TextureManager.AddTexture("illness", m_TextureManager.CreateFromFile("..\\Texture\\Texture_illness.dds",false,true));
 
     m_BasicEffect.SetTextureCube(m_TextureManager.GetTexture("Daylight"));
     
